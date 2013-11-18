@@ -1,0 +1,10 @@
+
+simple win
+--moves="1. wB1, 2.bG1 -wB1, 3. wS1 wB1-, 4. bQ /bG1, 5. wA1 wB1/, 6. bS1 /bQ, 7. wQ wB1\, 8. bS1 /wQ, 9. wG1 wQ-, 10. bB1 -bS1, 11. wA1 wQ\, 12. bB1 -wQ" 
+--moves="1. wB1, 2.bG1 -wB1, 3. wS1 wB1-, 4. bQ /bG1, 5. wA1 wB1/, 6. bS1 /bQ, 7. wQ wB1\, 8. bS1 /wQ, 9. wG1 wQ-, 10. bB1 -bS1, 11. wA1 wQ\, 12. bB1 -wQ" 
+
+a couple gates
+
+
+
+a couple doors

@@ -1,0 +1,512 @@
+5 piece types QBGAS
+
+3 numbers 123
+
+2 color bw
+
+8 x pos
+
+8 y pos
+
+3 z pos  (default = 5, if someone comes on top, they become 5 and covered piece becomes 4, if someone else goes on top, THEY become 5, covered two pieces move to 4 and 3, etc.)
+
+29
+
+3 spare
+
+//alternative: use z as bitwise (like pieces and numbers and take up 5 bits, this would leave only 1 spare)
+// this would lead to faster checking as we can use a bitmask
+
+
+
+
+256 x 256 board of uint8s (effectively just booleans)
+
+board[256][256];
+
+0,0 becomes 128,128 in order to handle negative stuff
+have transpose function which just adds 128 to coords
+
+
+QBGAS123BWxxxxxxxxyyyyyyyyzzz???
+
+uint32_t pieces[22]
+wQ1
+bQ1
+wB1
+wB2
+bB1
+bB2
+wG1
+wG2
+wG3
+bG1
+bG2
+bG3
+wA1
+wA2
+wA3
+bA1
+bA2
+bA3
+wS1
+wS2
+bS1
+bS2
+
+or split up colors?
+wQ1
+wB1
+wB2
+wG1
+wG2
+wG3
+wA1
+wA2
+wA3
+wS1
+wS2
+
+bQ1
+bB1
+bB2
+bG1
+bG2
+bG3
+bA1
+bA2
+bA3
+bS1
+bS2
+
+
+
+
+
+
+
+
+
+
+
+evaluation function
+
+
+first check iswin:
+iswin -> +10000 or -10000
+
+if no win, evaluate position:
+
+- mobility of pieces
+    - queen moves available  - # squares surrounding queen (let's call these almost-wins)
+    - beetle moves available - this will be either 6 or 0; let's count 0 as pretty strong because it's good to trap a beetle
+    - grasshopper moves available
+    - ant moves available (somehow cap this or make it worth little per move)
+    - spider moves available (max 2)
+
+
+
+
+
+helper functions
+
+###################################
+what are the occupied squares around a piece(xpos, ypos) - use board array to check if occupied on the 6 fronts, return uint8_t with bits representing directions
+so 1 = NE, 2 = E, 4 = SE, 8 = SW, 16 = W, 32 = NW  XX(NW)(W)(SW)(SE)(E)(NE)
+#typedef enum
+{
+    NE_SHIFT = 0,
+    E_SHIFT,
+    SE_SHIFT,
+    SW_SHIFT,
+    W_SHIFT,
+    NW_SHIFT,
+    MAX_SHIFT
+}
+
+retVal = 0;
+if (board[xpos+1][ypos+1] != 0) retVal |= (1 << NE_SHIFT)
+if (board[xpos+1][ypos] != 0) retVal |= (1 << E_SHIFT)
+if (board[xpos+1][ypos-1] != 0) retVal |= (1 << SE_SHIFT)
+if (board[xpos-1][ypos-1] != 0) retVal |= (1 << SW_SHIFT)
+if (board[xpos-1][ypos] != 0) retVal |= (1 << W_SHIFT)
+if (board[xpos-1][ypos+1] != 0) retVal |= (1 << NW_SHIFT)
+return retVal;
+
+###################################
+how many squares around a piece are occupied
+uint8_t sum = 0;
+uint8_t retVal = getOccupiedSquaresAroundPiece(xpos, ypos);
+for (int i = 0; i < 6; i++)
+{
+    if ((retVal >> i) & 1)
+        sum +=1;
+}
+sum = # of occupied spaces, retVal = which spaces
+
+
+###################################
+#define WHITE (1)
+#define BLACK (0)
+
+isWin (bool white)
+uint8_t xpos, ypos;
+if (white)
+{
+    xpos = getXpos(WHITE_QUEEN);
+    ypos = getYpos(WHITE_QUEEN);
+}
+else
+{
+    xpos = getXpos(BLACK_QUEEN);
+    ypos = getYpos(BLACK_QUEEN);
+}
+
+if (6 == getNumberOfOccupiedSquaresAroundPosition(xpos, ypos))
+    return true;
+
+
+
+###################################
+make a move
+take in piece and destination coordinates
+
+if (hasPieceBeenPlayed(piece))
+{
+    pickUpPiece(piece);
+}
+
+
+putDownPiece(piece, newxpos, newypos);
+
+
+###################################
+has a piece been played yet?
+take in piece
+
+bool hasPieceBeenPlayed(piece)
+{
+    if (!getXpos(piece) && !getYpos(piece))
+    {
+        return false;
+    }
+    return true;
+}
+
+
+###################################
+pick up a piece
+take in piece
+
+void pickUpPiece(piece)
+{
+    uint8_t origzpos = getZpos(piece);
+    uint8_t origxpos = getXpos(piece);
+    uint8_t origypos = getYpos(piece);
+
+    // if it wasn't on top, then we need to update all the pieces it was below
+    if (origzpos != TOP_ZPOS)
+    {
+        uint8_t xpos, ypos, zpos, origxpos, origypos;
+
+        for (int i = 0; i < TOTAL_PIECES; i++)
+        {
+            xpos = getXpos(i);
+            ypos = getYpos(i);
+
+            if (xpos == origxpos && ypos == origypos)
+            {
+                zpos = getZpos(i);
+
+                // make sure it isn't the same piece!
+                if (zpos != origzpos)
+                {
+                    // move the piece up and replaces its zpos
+                    zpos++;
+                    setZpos(i, zpos);
+                }
+            }
+        }
+
+        // don't update the gameboard, because there was a piece under the one we picked up
+    }
+    else
+    {
+        // update the game board
+        board[origxpos][origypos] = 0;
+    }
+}
+
+###################################
+put down a piece
+take in piece and new x y coords
+
+
+void putDownPiece(piece, xpos, ypos)
+{
+    // assume we don't need to do any validity checks here for now
+
+    if (isBeetle && board[xpos][ypos])
+    {
+        // we are a beetle and we are landing on something
+
+    }
+    else
+    {
+        setXpos(piece, xpos);
+        setYpos(piece, ypos);
+        board[xpos][ypos] = 1;
+
+    }
+}
+
+###################################
+set the x, y, and z positions
+
+void setXpos (uint8_t piece, xpos)
+{
+    // clear the old x position and then write the new position
+    pieces[piece] &= ~XCOORD_MASK;
+    pieces[piece] |= (xpos << XCOORD_SHIFT);
+}
+
+void setYpos (uint8_t piece, ypos)
+{
+    // clear the old x position and then write the new position
+    pieces[piece] &= ~YCOORD_MASK;
+    pieces[piece] |= (ypos << YCOORD_SHIFT);
+}
+
+void setZpos (uint8_t piece, zpos)
+{
+    // clear the old x position and then write the new position
+    pieces[piece] &= ~ZCOORD_MASK;
+    pieces[piece] |= (zpos << ZCOORD_SHIFT);
+}
+
+
+inline uint8_t getXpos (uint8_t piece)
+{
+    return (pieces[piece] & XCOORD_MASK) >> XCOORD_SHIFT;
+}
+
+inline uint8_t getYpos (uint8_t piece)
+{
+    // clear the old x position and then write the new position
+    pieces[piece] &= ~YCOORD_MASK;
+    pieces[piece] |= (ypos << YCOORD_SHIFT);
+}
+
+inline uint8_t getZpos (uint8_t piece)
+{
+    // clear the old x position and then write the new position
+    pieces[piece] &= ~ZCOORD_MASK;
+    pieces[piece] |= (zpos << ZCOORD_SHIFT);
+}
+
+
+###################################
+
+get piece information
+take in color, name, and number
+returns 0 if inconsistent information given
+
+#define TOTAL_PIECES 22
+
+
+uint32_t piece = 0;
+if (name == QUEEN)
+{
+    if (WHITE == color)
+    {
+        piece = pieces[WHITE_QUEEN];
+    }
+    else
+    {
+        piece = pieces[BLACK_QUEEN];
+    }
+}
+else if (name == BEETLE)
+{
+    if (WHITE == color)
+    {
+        if (1 == number)
+        {
+            piece = pieces[WHITE_BEETLE_ONE];
+        }
+        else if (2 == number)
+        {
+            piece = pieces[WHITE_BEETLE_TWO];
+        }
+    }
+    else
+    {
+        if (1 == number)
+        {
+            piece = pieces[BLACK_BEETLE_ONE];
+        }
+        else if (2 == number)
+        {
+            piece = pieces[BLACK_BEETLE_TWO];
+        }
+    }
+}
+else if (name == GRASSHOPPER)
+{
+    if (WHITE == color)
+    {
+        if (1 == number)
+        {
+            piece = pieces[WHITE_GRASSHOPPER_ONE];
+        }
+        else if (2 == number)
+        {
+            piece = pieces[WHITE_GRASSHOPPER_TWO];
+        }
+        else if (3 == number)
+        {
+            piece = pieces[WHITE_GRASSHOPPER_THREE];
+        }
+    }
+    else
+    {
+        if (1 == number)
+        {
+            piece = pieces[BLACK_GRASSHOPPER_ONE];
+        }
+        else if (2 == number)
+        {
+            piece = pieces[BLACK_GRASSHOPPER_TWO];
+        }
+        else if (3 == number)
+        {
+            piece = pieces[BLACK_GRASSHOPPER_THREE];
+        }
+    }
+
+}else if (name == ANT)
+{
+    if (WHITE == color)
+    {
+        if (1 == number)
+        {
+            piece = pieces[WHITE_ANT_ONE];
+        }
+        else if (2 == number)
+        {
+            piece = pieces[WHITE_ANT_TWO];
+        }
+        else if (3 == number)
+        {
+            piece = pieces[WHITE_ANT_THREE];
+        }
+    }
+    else
+    {
+        if (1 == number)
+        {
+            piece = pieces[BLACK_ANT_ONE];
+        }
+        else if (2 == number)
+        {
+            piece = pieces[BLACK_ANT_TWO];
+        }
+        else if (3 == number)
+        {
+            piece = pieces[BLACK_ANT_THREE];
+        }
+    }
+
+}else if (name == SPIDER)
+{
+    if (WHITE == color)
+    {
+        if (1 == number)
+        {
+            piece = pieces[WHITE_SPIDER_ONE];
+        }
+        else if (2 == number)
+        {
+            piece = pieces[WHITE_SPIDER_TWO];
+        }
+    }
+    else
+    {
+        if (1 == number)
+        {
+            piece = pieces[BLACK_SPIDER_ONE];
+        }
+        else if (2 == number)
+        {
+            piece = pieces[BLACK_SPIDER_TWO];
+        }
+    }
+}
+
+return piece;
+
+
+
+###################################
+bool isBeetle(piece)
+{
+    return ((piece == WHITE_BEETLE_ONE) ||
+            (piece == WHITE_BEETLE_TWO) ||
+            (piece == BLACK_BEETLE_ONE) ||
+            (piece == BLACK_BEETLE_TWO));
+}
+
+
+bool isSpider(piece)
+{
+    return ((piece == WHITE_SPIDER_ONE) ||
+            (piece == WHITE_SPIDER_TWO) ||
+            (piece == BLACK_SPIDER_ONE) ||
+            (piece == BLACK_SPIDER_TWO));
+}
+
+bool isQueen(piece)
+{
+    return ((piece == WHITE_QUEEN) ||
+            (piece == BLACK_QUEEN));
+}
+
+
+
+bool isAnt(piece)
+{
+    return ((piece == WHITE_ANT_ONE) ||
+            (piece == WHITE_ANT_TWO) ||
+            (piece == WHITE_ANT_THREE) ||
+            (piece == BLACK_ANT_ONE) ||
+            (piece == BLACK_ANT_TWO) ||
+            (piece == BLACK_ANT_THREE));
+}
+
+bool isGrasshopper(piece)
+{
+    return ((piece == WHITE_GRASSHOPPER_ONE) ||
+            (piece == WHITE_GRASSHOPPER_TWO) ||
+            (piece == WHITE_GRASSHOPPER_THREE) ||
+            (piece == BLACK_GRASSHOPPER_ONE) ||
+            (piece == BLACK_GRASSHOPPER_TWO) ||
+            (piece == BLACK_GRASSHOPPER_THREE));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###################################
+is coordinate a gate?
+if (getNumberOfOccupiedSquaresAroundPosition(xpos, ypos) == 5)
